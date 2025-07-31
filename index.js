@@ -2,8 +2,16 @@ require('dotenv').config();
 const { App, ExpressReceiver } = require('@slack/bolt');
 const { supabase } = require('./supabaseClient');
 
+// Create a custom ExpressReceiver
 const receiver = new ExpressReceiver({
   signingSecret: process.env.SLACK_SIGNING_SECRET
+});
+
+// 🔽 Add this route to respond to Slack challenge
+receiver.router.post('/slack/events', (req, res) => {
+  if (req.body.type === 'url_verification') {
+    return res.send({ challenge: req.body.challenge });
+  }
 });
 
 const app = new App({
@@ -11,12 +19,10 @@ const app = new App({
   receiver
 });
 
-// Slack message handler
+// Your message handler
 app.message(async ({ message, say }) => {
   if (!message.text) return;
-
   const lower = message.text.toLowerCase();
-
   if (lower.includes("standup")) {
     await say(`Hi <@${message.user}>! Please reply with the following:
 1. *Current ticket*  
@@ -25,10 +31,9 @@ app.message(async ({ message, say }) => {
   }
 });
 
-// Start the app (important!)
+// Start the server
 (async () => {
-  const port = process.env.PORT || 3000;
-
-  await app.start(port);
-  console.log(`⚡️ Slack Bolt app is running on port ${port}`);
+  await app.start(process.env.PORT || 3000);
+  console.log('⚡️ Slack Bolt app is running on port 3000');
 })();
+
