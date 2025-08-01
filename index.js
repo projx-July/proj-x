@@ -1,33 +1,26 @@
 require('dotenv').config();
-const { App, ExpressReceiver } = require('@slack/bolt');
-const express = require('express');
+const { App } = require('@slack/bolt');
 const { handleUpdateMessage } = require("./jira");
-
-const receiver = new ExpressReceiver({
-  signingSecret: process.env.SLACK_SIGNING_SECRET
-});
 
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
-  receiver
+  signingSecret: process.env.SLACK_SIGNING_SECRET,
+  processBeforeResponse: true
 });
 
-// Health check endpoint
-receiver.router.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
-// Slack event URL verification
-receiver.router.post('/slack/events', express.json(), (req, res) => {
-  console.log("📥 Received Slack event:", req.body);
-  
-  if (req.body.type === 'url_verification') {
-    console.log("✅ URL verification challenge received");
-    res.status(200).send(req.body.challenge);
-    return;
+// Add middleware to log ALL incoming events
+app.use(async ({ payload, next }) => {
+  console.log("🌍 Received Slack event:", payload.type || 'unknown');
+  if (payload.event) {
+    console.log("📝 Event details:", {
+      type: payload.event.type,
+      subtype: payload.event.subtype,
+      user: payload.event.user,
+      text: payload.event.text,
+      channel: payload.event.channel
+    });
   }
-  
-  res.status(400).send('Invalid verification request');
+  await next();
 });
 
 // Add error handling
@@ -45,8 +38,9 @@ app.message(async ({ message, say, client }) => {
   try {
     console.log("📨 Full message object:", JSON.stringify(message, null, 2));
     
-    if (!message.text) {
-      console.log("⚠️ No text in message");
+    // Skip bot messages and messages without text
+    if (message.subtype === 'bot_message' || !message.text) {
+      console.log("⚠️ Skipping bot message or message without text");
       return;
     }
 
@@ -128,7 +122,6 @@ app.command('/standup', async ({ command, ack, respond }) => {
     
     await app.start(port);
     console.log(`⚡️ Slack Bolt app running on port ${port}`);
-    console.log(`🌐 Health check available at: http://localhost:${port}/health`);
     
   } catch (error) {
     console.error("❌ Failed to start app:", error);
