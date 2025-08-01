@@ -24,7 +24,7 @@ receiver.router.post('/slack/verify', express.json(), (req, res) => {
 // ✅ Combined handler for all messages
 app.message(async ({ message, say }) => {
   if (!message.text) return;
-
+   console.log("🔥 Received message:", message.text);
   const text = message.text.toLowerCase();
 
   if (text.includes("in progress:") || text.includes("in review:") || text.includes("done:") || text.includes("to do:")) {
